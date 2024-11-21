@@ -9,6 +9,10 @@ String NOW;
 void setup() {
   video_files.put("1", "/Users/xlinx/Movies/1.mp4");
   video_files.put("2", "/Users/xlinx/Movies/8.mp4");
+  video_files.put("3", "/Users/xlinx/Movies/8.mp4");
+  video_files.put("4", "/Users/xlinx/Movies/8.mp4");
+  
+  
   NOW=video_files.get("2");
   size(560, 406);
   background(0);
