@@ -6,8 +6,19 @@ import numpy as np
 import datetime
 import glob
 import easyocr
+from ultralytics import YOLO
 from os.path import join
 from matplotlib import pyplot as plt
+yolo_model = YOLO('yolov8n.pt')
+# yolo_model = YOLO("yolo11n.pt")
+# results = model.train(data='custom_dataset.yaml', epochs=100, imgsz=640)
+# results = model.train(data='custom_dataset.yaml', epochs=100, imgsz=640, project='YOLOv8_training', name='experiment1')
+# Load a model
+# model = YOLO('yolov8n.yaml')  # build a new model from YAML
+# model = YOLO('yolov8n.pt')  # load a pretrained model (recommended for training)
+# model = YOLO('yolov8n.yaml').load('yolov8n.pt')  # build from YAML and transfer weights
+# # Train the model
+# results = model.train(data='coco128.yaml', epochs=100, imgsz=640)
 
 reader=easyocr.Reader(['en'])
 extension = '.jpg'
@@ -38,45 +49,40 @@ def directory_modified(dir_path, poll_timeout=1):
                 #     cv2.GaussianBlur(cv2.bilateralFilter(cv2.cvtColor(step1_rawImageX, cv2.COLOR_BGR2GRAY), 11, 17, 17), (5, 5),
                 #                      0), 170, 200), cv2.RETR_LIST,
                 #     cv2.CHAIN_APPROX_SIMPLE)  # 轉為灰階，去除背景雜訊，高斯模糊，取得邊緣，取得輪廓
+                stepA_rawImage_yolo = yolo_decade(imagePathX)
+                stepB_rawImageX=cv2.imread(imagePathX)
+                openCV_algorithm_processing(stepB_rawImageX,imagePathX)
 
-                step1_rawImageX=cv2.imread(imagePathX)
-                # step2_img_arr = np.array(step1_rawImageX)
-                # step3_gray =step1_rawImageX
-                # detect_plate(step1_rawImageX)
-
-                step3_gray=cv2.cvtColor(step1_rawImageX, cv2.COLOR_RGB2GRAY)
-                plt.imshow(step3_gray)
-                plt.show()
-
-                step4_bilateralFilter=cv2.bilateralFilter(step3_gray, 15, 17, 17)
-                plt.imshow(step4_bilateralFilter)
-                plt.show()
-
-                # step5_GaussianBlur=cv2.GaussianBlur(step4_bilateralFilter, (5, 5),0)
-                # plt.imshow(step5_GaussianBlur)
-                # plt.show()
-
-                # kernel = np.ones((7, 7), np.uint8)
-                # step5_blackhat = cv2.morphologyEx(step4_bilateralFilter, cv2.MORPH_BLACKHAT, kernel)
-                # plt.imshow(step5_blackhat)
-                # plt.title("step5_blackhat")
-                # plt.show()
-
-                step6_Canny =cv2.Canny( step4_bilateralFilter, 170, 200)
-                plt.imshow(step6_Canny)
-                plt.title("step6_Canny")
-                plt.show()
-
-                step7_Contours, _ = cv2.findContours(step6_Canny, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-
-                rectangleContoursX = []
-                working_mosaic(step7_Contours,rectangleContoursX,step1_rawImageX,imagePathX)
-                os.remove(imagePathX)
         else:
             print(datetime.datetime.now(),"[][monitor][same]input=",att_dir_input)
         time.sleep(poll_timeout)
 
+def openCV_algorithm_processing(rawImageX,imagePathX):
+    # step2_img_arr = np.array(step1_rawImageX)
+    # step3_gray =step1_rawImageX
+    # detect_plate(step1_rawImageX)
+    step3_gray = cv2.cvtColor(rawImageX, cv2.COLOR_RGB2GRAY)
+    plt.imshow(step3_gray)
+    plt.show()
+    step4_bilateralFilter = cv2.bilateralFilter(step3_gray, 15, 17, 17)
+    plt.imshow(step4_bilateralFilter)
+    plt.show()
+    # step5_GaussianBlur=cv2.GaussianBlur(step4_bilateralFilter, (5, 5),0)
+    # plt.imshow(step5_GaussianBlur)
+    # plt.show()
+    # kernel = np.ones((7, 7), np.uint8)
+    # step5_blackhat = cv2.morphologyEx(step4_bilateralFilter, cv2.MORPH_BLACKHAT, kernel)
+    # plt.imshow(step5_blackhat)
+    # plt.title("step5_blackhat")
+    # plt.show()
+    step6_Canny = cv2.Canny(step4_bilateralFilter, 170, 200)
+    plt.imshow(step6_Canny)
+    plt.title("step6_Canny")
+    plt.show()
+    step7_Contours, _ = cv2.findContours(step6_Canny, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    rectangleContoursX = []
+    working_mosaic(step7_Contours, rectangleContoursX, rawImageX, imagePathX)
+    os.remove(imagePathX)
 
 def detect_plate(image, lower=0, upper=20):
     image_contours = image.copy()
@@ -164,6 +170,40 @@ def ocr_decade(rawImage,x,y,w,h):
     print(datetime.datetime.now(), "[1][decade_hand_made_ocr]", resultX)
     return resultX
 
+#names: {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 5: 'bus',
+# 6: 'train', 7: 'truck', 8: 'boat', 9: 'traffic light', 10: 'fire hydrant',
+# 11: 'stop sign', 12: 'parking meter', 13: 'bench', 14: 'bird', 15: 'cat',
+# 16: 'dog', 17: 'horse', 18: 'sheep', 19: 'cow', 20: 'elephant',
+# 21: 'bear', 22: 'zebra', 23: 'giraffe', 24: 'backpack', 25: 'umbrella',
+# 26: 'handbag', 27: 'tie', 28: 'suitcase', 29: 'frisbee', 30: 'skis',
+# 31: 'snowboard', 32: 'sports ball', 33: 'kite', 34: 'baseball bat', 35: 'baseball glove',
+# 36: 'skateboard', 37: 'surfboard', 38: 'tennis racket', 39: 'bottle', 40: 'wine glass',
+# 41: 'cup', 42: 'fork', 43: 'knife', 44: 'spoon', 45: 'bowl',
+# 46: 'banana', 47: 'apple', 48: 'sandwich', 49: 'orange', 50: 'broccoli',
+# 51: 'carrot', 52: 'hot dog', 53: 'pizza', 54: 'donut', 55: 'cake',
+# 56: 'chair', 57: 'couch', 58: 'potted plant', 59: 'bed', 60: 'dining table',
+# 61: 'toilet', 62: 'tv', 63: 'laptop', 64: 'mouse', 65: 'remote',
+# 66: 'keyboard', 67: 'cell phone', 68: 'microwave', 69: 'oven', 70: 'toaster',
+# 71: 'sink', 72: 'refrigerator', 73: 'book', 74: 'clock', 75: 'vase',
+# 76: 'scissors', 77: 'teddy bear', 78: 'hair drier', 79: 'toothbrush'}
+
+def yolo_decade(imagePath):
+    results=yolo_model(imagePath)
+    print(datetime.datetime.now(), "[1][yolo_decade]",
+          # results[0].names,
+          results[0].boxes.cls,
+          # results[0].boxes.data,
+          results[0].boxes.conf,
+          results[0].boxes.xywh)
+
+    # for result in results:
+    #     result.show()
+    # annotated_frame=result[0].plot
+    # cv2.imshow("yolo_decade",annotated_frame)
+    plt.imshow(X=results[0].plot()[:,:,::-1])
+    plt.title("yolo_decade"+str(results[0].boxes.data))
+    plt.show()
+
 def working_with_filename(resultX, imagePath,rawImage,x, y, w, h):
     only_filename, *_ = os.path.basename(imagePath).partition('.')
     target_number_arr = only_filename.split("_")
@@ -195,11 +235,14 @@ def working_mosaic(contours,rectangleContours,rawImage,imagePath):
     for rectangleContour in rectangleContours:
         x, y, w, h = cv2.boundingRect(rectangleContour)  # 只取第一名，用一個最小的四邊形，把找到的輪廓包起來。
         # resultX1=ocr_x(rawImage,x, y, w, h)
-        resultX2=ocr_decade(rawImage,x, y, w, h)
-        working_with_filename(resultX2,imagePath, rawImage, x, y, w, h)
-        plt.imshow(rawImage)
-        plt.title("output_rawImage")
-        plt.show()
+        # resultX2=ocr_decade(rawImage,x, y, w, h)
+
+
+
+        # working_with_filename(resultX2,imagePath, rawImage, x, y, w, h)
+        # plt.imshow(rawImage)
+        # plt.title("output_rawImage")
+        # plt.show()
 
 
 directory_modified(att_dir_input, 5)
