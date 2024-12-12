@@ -6,11 +6,15 @@ import numpy as np
 import datetime
 import glob
 import easyocr
+import pytesseract
 from ultralytics import YOLO
+from PIL import Image, ImageFont, ImageDraw
+import platform
 from os.path import join
 from matplotlib import pyplot as plt
 yolo_model = YOLO('yolov8n.pt')
 # yolo_model = YOLO("yolo11n.pt")
+# yolo_model = YOLO("car_plate.pt")
 # results = model.train(data='custom_dataset.yaml', epochs=100, imgsz=640)
 # results = model.train(data='custom_dataset.yaml', epochs=100, imgsz=640, project='YOLOv8_training', name='experiment1')
 # Load a model
@@ -49,10 +53,15 @@ def directory_modified(dir_path, poll_timeout=1):
                 #     cv2.GaussianBlur(cv2.bilateralFilter(cv2.cvtColor(step1_rawImageX, cv2.COLOR_BGR2GRAY), 11, 17, 17), (5, 5),
                 #                      0), 170, 200), cv2.RETR_LIST,
                 #     cv2.CHAIN_APPROX_SIMPLE)  # 轉為灰階，去除背景雜訊，高斯模糊，取得邊緣，取得輪廓
-                stepA_rawImage_yolo = yolo_decade(imagePathX)
-                stepB_rawImageX=cv2.imread(imagePathX)
-                openCV_algorithm_processing(stepB_rawImageX,imagePathX)
+                cv2_img_readed = cv2.imread(imagePathX)
+                opt_A_rawImage_yolo = yolo_decade(cv2_img_readed,imagePathX)
+                # opt_B_rawImage_yolo = openCV_algorithm_processing(cv2_img_readed,imagePathX)
 
+                FINAL_RESULT=opt_A_rawImage_yolo
+                print("FINAL_RESULT",FINAL_RESULT)
+                for r in FINAL_RESULT:
+                    working_with_filename_and_blur_it(r['PLATE_NUM'],imagePathX,cv2_img_readed,r['X'],r['Y'],r['W'],r['H'])
+                os.remove(imagePathX)
         else:
             print(datetime.datetime.now(),"[][monitor][same]input=",att_dir_input)
         time.sleep(poll_timeout)
@@ -82,7 +91,7 @@ def openCV_algorithm_processing(rawImageX,imagePathX):
     step7_Contours, _ = cv2.findContours(step6_Canny, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     rectangleContoursX = []
     working_mosaic(step7_Contours, rectangleContoursX, rawImageX, imagePathX)
-    os.remove(imagePathX)
+
 
 def detect_plate(image, lower=0, upper=20):
     image_contours = image.copy()
@@ -170,7 +179,7 @@ def ocr_decade(rawImage,x,y,w,h):
     print(datetime.datetime.now(), "[1][decade_hand_made_ocr]", resultX)
     return resultX
 
-#names: {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 5: 'bus',
+#yolo class names: {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 5: 'bus',
 # 6: 'train', 7: 'truck', 8: 'boat', 9: 'traffic light', 10: 'fire hydrant',
 # 11: 'stop sign', 12: 'parking meter', 13: 'bench', 14: 'bird', 15: 'cat',
 # 16: 'dog', 17: 'horse', 18: 'sheep', 19: 'cow', 20: 'elephant',
@@ -186,25 +195,53 @@ def ocr_decade(rawImage,x,y,w,h):
 # 66: 'keyboard', 67: 'cell phone', 68: 'microwave', 69: 'oven', 70: 'toaster',
 # 71: 'sink', 72: 'refrigerator', 73: 'book', 74: 'clock', 75: 'vase',
 # 76: 'scissors', 77: 'teddy bear', 78: 'hair drier', 79: 'toothbrush'}
-
-def yolo_decade(imagePath):
-    results=yolo_model(imagePath)
+# https://docs.ultralytics.com/reference/engine/results/#ultralytics.engine.results.BaseTensor.shape
+def yolo_decade(raw,imagePath):
+    # yolo_results=yolo_model(imagePath,  classes=[2,3])
+    yolo_results = yolo_model(imagePath)
     print(datetime.datetime.now(), "[1][yolo_decade]",
-          # results[0].names,
-          results[0].boxes.cls,
-          # results[0].boxes.data,
-          results[0].boxes.conf,
-          results[0].boxes.xywh)
+          # yolo_results[0].names,
+          yolo_results[0].boxes.cls,
+          # yolo_results[0].boxes.data,
+          "[1][yolo_decade]conf=",yolo_results[0].boxes.conf,
+          yolo_results[0].boxes.xywh,
+          # yolo_results[0].plot()
+          )
+    boxes = yolo_results[0].boxes.xyxy
+    result=[]
+    for index,box in enumerate(boxes):
+        # if yolo_results[0].boxes.conf[index] <0.8:
+        #     continue
 
-    # for result in results:
+        # box=box.cpu().numpy()
+        x1 = int(box[0])
+        y1 = int(box[1])
+        x2 = int(box[2])
+        y2 = int(box[3])
+        cv2.rectangle(raw, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        tmp = cv2.cvtColor(raw[y1:y2, x1:x2].copy(), cv2.COLOR_RGB2GRAY)
+        license = pytesseract.image_to_string(tmp, lang='eng', config='--psm 11').replace(" ", "").replace("\n", "").replace("-", "").replace("]", "1")
+        result.append({'PLATE_NUM': license, 'X': x1, 'Y': y1, 'W': abs(x2-x1), 'H': abs(y2-y1)})
+        print(datetime.datetime.now(), "[2][ocr=pytesseract][yolo_decade][license]",license)
+        # img = text(raw, license, (x1, y1 - 20), (0, 255, 0), 25)
+        plt.imshow(tmp)
+        plt.title("yolo_plate_decade")
+        plt.show()
+    # plt.subplot(2,3,i+1)
+    # plt.axis("off")
+    # plt.imshow(raw)
+    # for result in yolo_results:
     #     result.show()
     # annotated_frame=result[0].plot
     # cv2.imshow("yolo_decade",annotated_frame)
-    plt.imshow(X=results[0].plot()[:,:,::-1])
-    plt.title("yolo_decade"+str(results[0].boxes.data))
+    plt.imshow(X=yolo_results[0].plot()[:,:,::-1])
+    plt.title("yolo_decade")
     plt.show()
 
-def working_with_filename(resultX, imagePath,rawImage,x, y, w, h):
+    return result
+    # cv2.waitKey(0)
+
+def working_with_filename_and_blur_it(resultX, imagePath,rawImage,x, y, w, h):
     only_filename, *_ = os.path.basename(imagePath).partition('.')
     target_number_arr = only_filename.split("_")
     output_filename = "mosaic_" + os.path.basename(imagePath)
@@ -237,8 +274,18 @@ def working_mosaic(contours,rectangleContours,rawImage,imagePath):
         # resultX1=ocr_x(rawImage,x, y, w, h)
         # resultX2=ocr_decade(rawImage,x, y, w, h)
 
-
-
+def text(img, text, xy=(0, 0), color=(0, 0, 0), size=20):
+    pil = Image.fromarray(img)
+    s = platform.system()
+    if s == "Linux":
+        font = ImageFont.truetype('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc', size)
+    elif s == "Darwin":
+        font = ImageFont.truetype('/Library/Fonts/SourceCodePro-Bold.ttf', size)
+    else:
+        font = ImageFont.truetype('simsun.ttc', size)
+    ImageDraw.Draw(pil).text(xy, text, font=font, fill=color)
+    return np.asarray(pil)
+    #find {/System,}/Library/Fonts -name \*ttf
         # working_with_filename(resultX2,imagePath, rawImage, x, y, w, h)
         # plt.imshow(rawImage)
         # plt.title("output_rawImage")
